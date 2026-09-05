@@ -10,16 +10,38 @@ const noteRoutes = require("./routes/notes");
 
 const app = express();
 
+// Render रिवर्स प्रॉक्सी के पीछे चलता है, इसलिए रेट लिमिटर के लिए इसे इनेबल करना ज़रूरी है
+app.set("trust proxy", 1);
+
 // 1. Security Headers
 app.use(helmet());
 
-// 2. CORS Policy (Allows local dev & future deployed frontend URL)
+// 2. CORS Policy (Local + Production Vercel App)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://ai-notes-generator-seven.vercel.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // मोबाइल ऐप्स, पोस्टमैन या बिना ऑरिजिन वाली रिक्वेस्ट्स को अनुमति दें
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Preflight (OPTIONS) रिक्वेस्ट्स को सही से हैंडल करने के लिए
+app.options("*", cors());
 
 // 3. Body Parser with payload size restriction
 app.use(express.json({ limit: "10kb" }));

@@ -41,7 +41,6 @@ app.use(
 );
 
 // Preflight (OPTIONS) रिक्वेस्ट्स को सही से हैंडल करने के लिए
-app.options("*", cors());
 
 // 3. Body Parser with payload size restriction
 app.use(express.json({ limit: "10kb" }));

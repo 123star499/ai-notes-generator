@@ -1,0 +1,84 @@
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+require("dotenv").config();
+
+const db = require("./db");
+const authRoutes = require("./routes/auth");
+const noteRoutes = require("./routes/notes");
+
+const app = express();
+
+// 1. Security Headers
+app.use(helmet());
+
+// 2. CORS Policy (Allows local dev & future deployed frontend URL)
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+// 3. Body Parser with payload size restriction
+app.use(express.json({ limit: "10kb" }));
+
+// 4. Rate Limiter for Gemini AI Generation (Prevents API quota abuse)
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes window
+  max: 20, // Limit each IP to 20 AI generations per window
+  message: {
+    success: false,
+    message: "Too many AI generation requests. Please try again after 15 minutes.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiter specifically to the AI route
+app.use("/api/notes/generate", aiLimiter);
+
+// 5. Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/notes", noteRoutes);
+
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.json({
+    status: "Healthy",
+    message: "AI Notes Generator Backend is Live and Secure!",
+  });
+});
+
+// Test Users Endpoint
+app.get("/api/test-users", async (req, res) => {
+  try {
+    const [rows] = await db.query("SELECT id, name, email FROM users");
+    res.json({
+      success: true,
+      users: rows,
+    });
+  } catch (error) {
+    console.error("Test Users Query Failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database query failed",
+    });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+db.getConnection()
+  .then((connection) => {
+    console.log("MySQL Database Connected Successfully!");
+    connection.release();
+  })
+  .catch((error) => {
+    console.error("MySQL Connection Failed:", error.message);
+  });

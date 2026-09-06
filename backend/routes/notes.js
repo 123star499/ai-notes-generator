@@ -13,7 +13,7 @@ router.post("/generate", verifyToken, async (req, res) => {
     if (!topic || typeof topic !== "string" || !topic.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Topic is required to generate notes."
+        message: "Topic is required to generate notes.",
       });
     }
 
@@ -32,15 +32,15 @@ router.post("/generate", verifyToken, async (req, res) => {
       note: {
         id: result.insertId,
         title: topic.trim(),
-        content: aiGeneratedContent
-      }
+        content: aiGeneratedContent,
+      },
     });
-
   } catch (error) {
     console.error("AI Generation Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to generate notes using AI."
+      message: "Failed to generate notes using AI.",
+      error: error.message,
     });
   }
 });
@@ -53,7 +53,7 @@ router.post("/", verifyToken, async (req, res) => {
     if (!title || !content) {
       return res.status(400).json({
         success: false,
-        message: "Title and content are required."
+        message: "Title and content are required.",
       });
     }
 
@@ -65,34 +65,37 @@ router.post("/", verifyToken, async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Note created successfully.",
-      noteId: result.insertId
+      noteId: result.insertId,
     });
   } catch (error) {
     console.error("Create Note Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to create note."
+      message: "Failed to create note.",
+      error: error.message,
     });
   }
 });
 
-// 3. Get All Notes of Logged-in User (Protected)
+// 3. Get All Notes of Logged-in User (Protected) - 500 Error Fixed
 router.get("/", verifyToken, async (req, res) => {
   try {
+    // केवल वही कॉलम माँगे गए हैं जो हर टेबल में मौजूद होते हैं
     const [notes] = await db.query(
-      "SELECT id, title, content, created_at, updated_at FROM notes WHERE user_id = ? ORDER BY created_at DESC",
+      "SELECT id, title, content FROM notes WHERE user_id = ? ORDER BY id DESC",
       [req.user.id]
     );
 
     return res.status(200).json({
       success: true,
-      notes
+      notes,
     });
   } catch (error) {
     console.error("Fetch Notes Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to fetch notes."
+      message: "Failed to fetch notes.",
+      error: error.message,
     });
   }
 });
@@ -110,19 +113,20 @@ router.delete("/:id", verifyToken, async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({
         success: false,
-        message: "Note not found or unauthorized to delete."
+        message: "Note not found or unauthorized to delete.",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Note deleted successfully."
+      message: "Note deleted successfully.",
     });
   } catch (error) {
     console.error("Delete Note Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to delete note."
+      message: "Failed to delete note.",
+      error: error.message,
     });
   }
 });

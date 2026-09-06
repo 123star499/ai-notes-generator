@@ -8,20 +8,39 @@ export default function Dashboard() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  // Generator States
   const [topic, setTopic] = useState("");
+  const [difficulty, setDifficulty] = useState("Intermediate");
   const [format, setFormat] = useState("bullet-points");
   const [loading, setLoading] = useState(false);
+
+  // App States
   const [notes, setNotes] = useState([]);
   const [activeNote, setActiveNote] = useState(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Theme State
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("app_theme") || "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-bs-theme", theme);
+    localStorage.setItem("app_theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
+  };
 
   const suggestions = [
     "Operating System Process Scheduling",
     "Database Normalization (1NF to BCNF)",
-    "Object-Oriented Programming Principles",
-    "TCP/IP vs OSI Model Breakdown"
+    "Object-Oriented Programming in Java",
+    "TCP/IP vs OSI Model Architecture"
   ];
 
   useEffect(() => {
@@ -31,6 +50,12 @@ export default function Dashboard() {
     }
     fetchNotes();
   }, [user]);
+
+  // Stop speech if switching notes
+  useEffect(() => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  }, [activeNote]);
 
   const fetchNotes = async () => {
     try {
@@ -54,13 +79,18 @@ export default function Dashboard() {
     setStatusMsg({ type: "", text: "" });
 
     try {
-      const res = await API.post("/notes/generate", { topic, format });
+      // Sends combined topic, difficulty, and format to backend
+      const res = await API.post("/notes/generate", { 
+        topic: `${topic.trim()} (Target Level: ${difficulty})`, 
+        format 
+      });
+
       if (res.data.success) {
         const newNote = res.data.note;
         setNotes([newNote, ...notes]);
         setActiveNote(newNote);
         setTopic("");
-        setStatusMsg({ type: "success", text: "Note generated & saved to your database!" });
+        setStatusMsg({ type: "success", text: "Study note successfully generated & saved!" });
       }
     } catch (err) {
       setStatusMsg({
@@ -94,7 +124,7 @@ export default function Dashboard() {
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  const handleDownload = () => {
+  const handleDownloadTxt = () => {
     if (!activeNote?.content) return;
     const element = document.createElement("a");
     const file = new Blob([activeNote.content], { type: "text/plain;charset=utf-8" });
@@ -105,12 +135,61 @@ export default function Dashboard() {
     document.body.removeChild(element);
   };
 
+  // Browser-native Clean Print / Save to PDF
+  const handlePrintPDF = () => {
+    if (!activeNote) return;
+    const printWindow = window.open("", "_blank");
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${activeNote.title}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; line-height: 1.6; color: #212529; }
+            h1 { font-size: 24px; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; margin-bottom: 20px; }
+            pre { background: #f8f9fa; padding: 12px; border-radius: 6px; }
+          </style>
+        </head>
+        <body>
+          <h1>${activeNote.title}</h1>
+          <div>${document.getElementById("active-note-markdown")?.innerHTML || activeNote.content}</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  // Text-To-Speech Player
+  const toggleSpeech = () => {
+    if (!("speechSynthesis" in window)) {
+      alert("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      const cleanText = activeNote.content.replace(/[#*`_-]/g, "");
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 0.95;
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+    }
+  };
+
+  const wordCount = activeNote?.content ? activeNote.content.trim().split(/\s+/).length : 0;
+  const readTime = Math.ceil(wordCount / 180);
+
   const filteredNotes = notes.filter((n) =>
     n.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="container-fluid px-lg-5 py-4 bg-light min-vh-100">
+    <div className="container-fluid px-lg-5 py-4 bg-body-tertiary min-vh-100">
       {/* Header Banner */}
       <div className="row mb-4">
         <div className="col-12">
@@ -119,36 +198,47 @@ export default function Dashboard() {
               <div>
                 <h3 className="fw-bold mb-1">AI Study Workspace 🚀</h3>
                 <p className="mb-0 text-white-50">
-                  Generate structured revision notes with Gemini AI and auto-save them to your account.
+                  Generate comprehensive academic notes with AI and auto-sync them across sessions.
                 </p>
               </div>
-              <span className="badge bg-white text-primary px-3 py-2 rounded-pill fs-6">
-                Saved Notes: {notes.length}
-              </span>
+
+              <div className="d-flex align-items-center gap-3">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="btn btn-light btn-sm px-3 py-2 rounded-pill fw-semibold shadow-sm d-flex align-items-center gap-2"
+                >
+                  {theme === "light" ? <span>🌙 Dark Mode</span> : <span>☀️ Light Mode</span>}
+                </button>
+
+                <span className="badge bg-white text-primary px-3 py-2 rounded-pill fs-6 shadow-sm">
+                  Saved Notes: {notes.length}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {statusMsg.text && (
-        <div className={`alert alert-${statusMsg.type} alert-dismissible fade show rounded-3`} role="alert">
+        <div className={`alert alert-${statusMsg.type} alert-dismissible fade show rounded-3 shadow-sm`} role="alert">
           {statusMsg.text}
           <button type="button" className="btn-close" onClick={() => setStatusMsg({ type: "", text: "" })}></button>
         </div>
       )}
 
       <div className="row g-4">
-        {/* Left Column */}
+        {/* Left Column: Generator Form & Saved List */}
         <div className="col-lg-5 col-xl-4">
-          <div className="card border-0 shadow-sm rounded-4 p-4 mb-4">
-            <h5 className="fw-bold mb-3 text-dark">✨ Generate New Note</h5>
+          <div className="card border-0 shadow-sm rounded-4 p-4 mb-4 bg-body">
+            <h5 className="fw-bold mb-3">✨ Generate New Note</h5>
             <form onSubmit={handleGenerate}>
               <div className="mb-3">
                 <label className="form-label fw-semibold small text-muted">Topic or Question</label>
                 <input
                   type="text"
                   className="form-control form-control-lg rounded-3 fs-6"
-                  placeholder="e.g. Distributed Systems Architecture"
+                  placeholder="e.g. Distributed Operating Systems"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   disabled={loading}
@@ -174,18 +264,35 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="form-label fw-semibold small text-muted">Format Style</label>
-                <select
-                  className="form-select rounded-3"
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  disabled={loading}
-                >
-                  <option value="bullet-points">Bullet Points (Quick Revision)</option>
-                  <option value="detailed-summary">Detailed Deep Dive</option>
-                  <option value="exam-prep">Exam Cheat-Sheet & Definitions</option>
-                </select>
+              <div className="row g-2 mb-3">
+                <div className="col-6">
+                  <label className="form-label fw-semibold small text-muted">Difficulty Level</label>
+                  <select
+                    className="form-select rounded-3"
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="Beginner">Beginner (Foundational)</option>
+                    <option value="Intermediate">Intermediate (Undergrad)</option>
+                    <option value="Advanced">Advanced (Deep Dive)</option>
+                  </select>
+                </div>
+
+                <div className="col-6">
+                  <label className="form-label fw-semibold small text-muted">Note Format</label>
+                  <select
+                    className="form-select rounded-3"
+                    value={format}
+                    onChange={(e) => setFormat(e.target.value)}
+                    disabled={loading}
+                  >
+                    <option value="bullet-points">Bullet Points</option>
+                    <option value="detailed-summary">Detailed Explanation</option>
+                    <option value="exam-prep">Exam QA & Key Formulas</option>
+                    <option value="mcq">Practice MCQs with Answers</option>
+                  </select>
+                </div>
               </div>
 
               <button
@@ -196,7 +303,7 @@ export default function Dashboard() {
                 {loading ? (
                   <>
                     <span className="spinner-border spinner-border-sm me-2" role="status"></span>
-                    Generating with Gemini...
+                    Synthesizing with AI...
                   </>
                 ) : (
                   "Generate & Save Note"
@@ -206,8 +313,8 @@ export default function Dashboard() {
           </div>
 
           {/* Notes Drawer */}
-          <div className="card border-0 shadow-sm rounded-4 p-3">
-            <h6 className="fw-bold mb-2 px-2 text-dark">📚 Your Saved Notes</h6>
+          <div className="card border-0 shadow-sm rounded-4 p-3 bg-body">
+            <h6 className="fw-bold mb-2 px-2">📚 Your Saved Notes</h6>
 
             <div className="mb-3 px-1">
               <input
@@ -229,8 +336,8 @@ export default function Dashboard() {
                   <div
                     key={n.id}
                     onClick={() => setActiveNote(n)}
-                    className={`card mb-2 p-3 border-0 rounded-3 cursor-pointer ${
-                      activeNote?.id === n.id ? "bg-primary text-white shadow-sm" : "bg-white border"
+                    className={`card mb-2 p-3 border rounded-3 cursor-pointer ${
+                      activeNote?.id === n.id ? "bg-primary text-white shadow-sm border-primary" : "bg-body"
                     }`}
                     style={{ cursor: "pointer", transition: "all 0.2s ease" }}
                   >
@@ -261,24 +368,49 @@ export default function Dashboard() {
 
         {/* Right Column: Markdown Active Note Display */}
         <div className="col-lg-7 col-xl-8">
-          <div className="card border-0 shadow-sm rounded-4 p-4 h-100 bg-white d-flex flex-column">
+          <div className="card border-0 shadow-sm rounded-4 p-4 h-100 bg-body d-flex flex-column">
             {activeNote ? (
               <>
                 <div className="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
-                  <h4 className="fw-bold text-dark mb-0">{activeNote.title}</h4>
-                  <div className="d-flex gap-2">
+                  <div>
+                    <h4 className="fw-bold mb-1">{activeNote.title}</h4>
+                    <span className="text-muted small">
+                      📖 {wordCount} words • ~{readTime} min read
+                    </span>
+                  </div>
+
+                  <div className="d-flex flex-wrap gap-2">
+                    {/* Audio Reader */}
+                    <button
+                      onClick={toggleSpeech}
+                      className={`btn btn-sm rounded-pill px-3 ${
+                        isSpeaking ? "btn-warning text-dark" : "btn-outline-info"
+                      }`}
+                    >
+                      {isSpeaking ? "⏹ Stop Audio" : "🔊 Listen"}
+                    </button>
+
                     <button
                       onClick={handleCopy}
                       className="btn btn-outline-secondary btn-sm rounded-pill px-3"
                     >
-                      {copySuccess ? "✓ Copied" : "📋 Copy Content"}
+                      {copySuccess ? "✓ Copied" : "📋 Copy"}
                     </button>
+
                     <button
-                      onClick={handleDownload}
+                      onClick={handlePrintPDF}
+                      className="btn btn-outline-success btn-sm rounded-pill px-3"
+                    >
+                      🖨️ PDF / Print
+                    </button>
+
+                    <button
+                      onClick={handleDownloadTxt}
                       className="btn btn-outline-primary btn-sm rounded-pill px-3"
                     >
-                      💾 Download (.txt)
+                      💾 .txt
                     </button>
+
                     <button
                       onClick={() => handleDelete(activeNote.id)}
                       className="btn btn-outline-danger btn-sm rounded-pill px-3"
@@ -289,7 +421,11 @@ export default function Dashboard() {
                 </div>
 
                 {/* Markdown Render Area */}
-                <div className="flex-grow-1 overflow-auto pe-2 text-secondary" style={{ lineHeight: "1.7" }}>
+                <div 
+                  id="active-note-markdown" 
+                  className="flex-grow-1 overflow-auto pe-2" 
+                  style={{ lineHeight: "1.75" }}
+                >
                   <ReactMarkdown>{activeNote.content}</ReactMarkdown>
                 </div>
               </>
@@ -298,7 +434,7 @@ export default function Dashboard() {
                 <div className="fs-1 mb-2">📝</div>
                 <h5 className="fw-bold text-secondary">No Note Selected</h5>
                 <p className="text-muted small">
-                  Select a saved note from the sidebar or generate a new one on the left.
+                  Select an item from the left drawer or generate a brand new note.
                 </p>
               </div>
             )}

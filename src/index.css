@@ -34,3 +34,23 @@ select {
 .form-select:focus {
   box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
 }
+
+/* Light Mode Default */
+.theme-navbar {
+  background-color: #ffffff;
+  border-color: #e5e7eb;
+}
+.logo-text, .nav-link-custom, .user-greeting {
+  color: #111827 !important;
+}
+
+/* Dark Mode Active (जब <html> या <body> पर .dark क्लास हो) */
+.dark .theme-navbar {
+  background-color: #18181b !important; /* Zinc Dark */
+  border-color: #27272a !important;
+}
+.dark .logo-text, 
+.dark .nav-link-custom, 
+.dark .user-greeting {
+  color: #f4f4f5 !important; /* White / Light gray */
+}

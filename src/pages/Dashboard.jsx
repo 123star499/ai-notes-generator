@@ -22,19 +22,7 @@ export default function Dashboard() {
   const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Theme State
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("app_theme") || "light";
-  });
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-bs-theme", theme);
-    localStorage.setItem("app_theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
-  };
+  
 
   const suggestions = [
     "Operating System Process Scheduling",
@@ -203,13 +191,7 @@ export default function Dashboard() {
               </div>
 
               <div className="d-flex align-items-center gap-3">
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="btn btn-light btn-sm px-3 py-2 rounded-pill fw-semibold shadow-sm d-flex align-items-center gap-2"
-                >
-                  {theme === "light" ? <span>🌙 Dark Mode</span> : <span>☀️ Light Mode</span>}
-                </button>
+                
 
                 <span className="badge bg-white text-primary px-3 py-2 rounded-pill fs-6 shadow-sm">
                   Saved Notes: {notes.length}

@@ -1,13 +1,25 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
-// अगर आपका डार्क मोड स्टेट किसी ThemeContext में है तो उसे इम्पोर्ट करें, 
-// अन्यथा यह localStorage/document.documentElement को सीधा टॉगल करेगा।
-function Navbar({ darkMode, setDarkMode }) {
+function Navbar() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [isNavOpen, setIsNavOpen] = useState(false);
+  
+  // Theme State
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("app_theme") || "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-bs-theme", theme);
+    localStorage.setItem("app_theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
 
   const handleLogout = () => {
     logout();
@@ -15,33 +27,15 @@ function Navbar({ darkMode, setDarkMode }) {
     navigate("/login");
   };
 
-  const toggleNavbar = () => {
-    setIsNavOpen(!isNavOpen);
-  };
-
-  const closeNavbar = () => {
-    setIsNavOpen(false);
-  };
-
-  // डार्क मोड टॉगल हैंडलर
-  const handleThemeToggle = () => {
-    if (setDarkMode) {
-      setDarkMode(!darkMode);
-    } else {
-      const isDark = document.documentElement.classList.toggle("dark");
-      localStorage.setItem("theme", isDark ? "dark" : "light");
-    }
-  };
-
   return (
-    <nav className="navbar navbar-expand-lg border-bottom shadow-sm sticky-top theme-navbar">
+    <nav className="navbar navbar-expand-lg border-bottom shadow-sm sticky-top bg-body">
       <div className="container py-1">
 
         {/* Logo */}
         <Link 
-          className="navbar-brand fw-bold fs-4 d-flex align-items-center gap-2 logo-text" 
+          className="navbar-brand fw-bold fs-4 d-flex align-items-center gap-2 text-body" 
           to={user ? "/dashboard" : "/login"}
-          onClick={closeNavbar}
+          onClick={() => setIsNavOpen(false)}
         >
           <span>🧠</span>
           <span>
@@ -49,11 +43,11 @@ function Navbar({ darkMode, setDarkMode }) {
           </span>
         </Link>
 
-        {/* Mobile Toggle Button */}
+        {/* Mobile Hamburger Button */}
         <button
           className="navbar-toggler"
           type="button"
-          onClick={toggleNavbar}
+          onClick={() => setIsNavOpen(!isNavOpen)}
           aria-expanded={isNavOpen}
           aria-label="Toggle navigation"
         >
@@ -67,9 +61,9 @@ function Navbar({ darkMode, setDarkMode }) {
             {user && (
               <li className="nav-item">
                 <Link 
-                  className="nav-link fw-semibold nav-link-custom" 
+                  className="nav-link fw-semibold text-body" 
                   to="/dashboard"
-                  onClick={closeNavbar}
+                  onClick={() => setIsNavOpen(false)}
                 >
                   📝 My Notes
                 </Link>
@@ -79,20 +73,19 @@ function Navbar({ darkMode, setDarkMode }) {
 
           <div className="d-flex align-items-center gap-2 mt-2 mt-lg-0">
             
-            {/* Theme Toggle Button (अब मोबाइल और डेस्कटॉप दोनों पर हमेशा दिखेगा) */}
+            {/* Theme Toggle Button (हमेशा Navbar में दिखेगा) */}
             <button
-              onClick={handleThemeToggle}
+              onClick={toggleTheme}
               type="button"
               className="btn btn-sm btn-outline-secondary rounded-pill px-3 me-2"
-              title="Toggle Theme"
             >
-              {darkMode ? "☀️ Light" : "🌙 Dark"}
+              {theme === "light" ? "🌙 Dark" : "☀️ Light"}
             </button>
 
             {user ? (
               <div className="d-flex align-items-center gap-3">
-                <span className="user-greeting small">
-                  Hi, <strong>{user.name}</strong>
+                <span className="text-muted small">
+                  Hi, <strong className="text-body">{user.name}</strong>
                 </span>
                 <button 
                   onClick={handleLogout} 
@@ -106,14 +99,14 @@ function Navbar({ darkMode, setDarkMode }) {
                 <Link 
                   to="/login" 
                   className="btn btn-outline-primary px-3 rounded-pill"
-                  onClick={closeNavbar}
+                  onClick={() => setIsNavOpen(false)}
                 >
                   Login
                 </Link>
                 <Link 
                   to="/register" 
                   className="btn btn-primary px-3 rounded-pill"
-                  onClick={closeNavbar}
+                  onClick={() => setIsNavOpen(false)}
                 >
                   Get Started
                 </Link>
